@@ -1,0 +1,18 @@
+{
+    "configurations": [
+        {
+            "name": "Win64",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.6/include",
+                "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.43.34808/include"
+            ],
+            "defines": [],
+            "compilerPath": "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.43.34808/bin/Hostx64/x64/cl.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-msvc-x64"
+        }
+    ],
+    "version": 4
+}

@@ -1,0 +1,30 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build CUDA Program",
+            "type": "shell",
+            "command": "nvcc",
+            "args": [
+                "-gencode", "arch=compute_86,code=sm_86",
+                "-rdc=true",
+                "-o", "main.exe",
+                "main.cu",
+                "winlib.cpp",
+                "engine.cu",
+                "-Xcompiler", "/MD",
+                "-Xlinker", "/NODEFAULTLIB:LIBCMT",
+                "-lcudadevrt",
+                "-luser32",
+                "-lgdi32",
+                "-lkernel32"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [],
+            "detail": "CUDA Build for RTX 3050"
+        }
+    ]
+}
