@@ -387,6 +387,10 @@ interpolator tickLogic(int tickCount,int2 mouse,bool mousePressed,bool* keys) {
                         
                 }
 
+                if (fabsf(player.position.x - (wx+2)) < 10 && fabsf(player.position.z - (wz+2)) < 10 && ((int)wz)%4==0 && ((int)wx)%4==0) {
+                    loadMesh(0, make_float3(wx,0.0f,wz), make_float3(0.0f,1.0f,0.0f), 0.5f, 0.0f);
+                }
+
                 if (x==14 || z==14) {
                     if (!maze.cells[x][z].right) {
                         if (fabsf(player.position.x - (wx+2)) < 10 && fabsf(player.position.z - (wz+2)) < 10) {
@@ -401,13 +405,16 @@ interpolator tickLogic(int tickCount,int2 mouse,bool mousePressed,bool* keys) {
                         }
                             
                     }
+                    if (fabsf(player.position.x - (wx+2)) < 10 && fabsf(player.position.z - (wz+2)) < 10 && ((int)wz)%4==0 && ((int)wx)%4==0) {
+                        loadMesh(0, make_float3(wx+4,0.0f,wz+4), make_float3(0.0f,1.0f,0.0f), 0.5f, 0.0f);
+                    }
                 }
 
-                if (fabsf(player.position.x - (wx+2)) < 10 && fabsf(player.position.z - (wz+2)) < 10 && ((int)wz)%4==0 && ((int)wx)%4==0) {
-                    loadMesh(0, make_float3(wx,0.0f,wz), make_float3(0.0f,1.0f,0.0f), 0.5f, 0.0f);
-                }
+                
 
-                // Optional: also draw right/down if you want full coverage
+                if (x==14 && z==14) {
+                        loadMesh(0, make_float3(wx+2,0.0f,wz+2), make_float3(1.0f,2.0f,3.0f), 0.5f, 0.05f * tickCount);
+                }
             }
         }
 
