@@ -4,12 +4,13 @@
 #include <cuda_runtime.h>
 #include <windows.h>
 #include <vector>
+#include <string>
 
 using namespace nvcuda;
 constexpr float pi = 3.14159265358979323846f; // Define pi as a constant
-constexpr int maxAmountOfModels = 256*1024; // maximum amount of models device will store
-constexpr int maxAmountOfTriangles = 64*1024*1024; // maximum amount of triangles that can be rendered
-constexpr int maxAmountOfMeshes = 1024*1024; // maximum amount of triangles that can be rendered
+constexpr int maxAmountOfModels = 256/*1024*/; // maximum amount of models device will store
+constexpr int maxAmountOfTriangles = /*64*102*/4*1024; // maximum amount of triangles that can be rendered
+constexpr int maxAmountOfMeshes = /*1024*/1024; // maximum amount of triangles that can be rendered
 Model* models; // device pointer to array of models
 Triangle** triAllocs; // host pointer to array of dev ptrs to triangle arrays, obtained from allocation, for freeing
 std::vector<int> usedModelIDs; // list of model ids allocated to, used for freeing
@@ -60,14 +61,181 @@ struct Player {
 };
 
 Player player;
-int2 lastMousePos;
 
+
+
+struct Cell {
+    bool up;
+    bool down;
+    bool left;
+    bool right;
+};
+
+struct Maze {
+    Cell cells[15][15];
+};
+
+int checkCell(int2 pos, bool visited[15][15]) {
+    int directions[4][2] = {{-1, 0}, {0, 1}, {1, 0}, {0, -1}}; // up, right, down, left
+    int validDirs[4];
+    int validCount = 0;
+    
+    for (int i = 0; i < 4; i++) {
+        int newX = pos.x + directions[i][0];
+        int newZ = pos.y + directions[i][1];
+        
+        // Check bounds and if not visited
+        if (newX >= 0 && newX < 15 && newZ >= 0 && newZ < 15 && !visited[newX][newZ]) {
+            validDirs[validCount++] = i;
+        }
+    }
+    
+    if (validCount == 0) return -1;
+    
+    return validDirs[rand() % validCount];
+}
+
+
+// Generates a 15x15 maze using a hunt-and-kill algorithm.
+// Each cell contains boolean flags for open paths 
+// The function returns a Maze struct with all cell connections set according to the generated maze.
+Maze generateMaze() {
+    srand(time(0));
+    Maze maze;
+
+    for (int i = 0;i<15;i++) {
+        for (int j = 0;j<15;j++) {
+            maze.cells[i][j].down = false;
+            maze.cells[i][j].left = false;
+            maze.cells[i][j].right = false;
+            maze.cells[i][j].up = false;
+        }
+    }
+
+    bool visited[15][15];
+    for (int i = 0; i < 15; ++i) {
+        for (int j = 0; j < 15; ++j) {
+            visited[i][j] = false;
+        }
+    }
+    visited[0][0] = true;
+
+    int2 focusedCell = make_int2(0,0);
+
+    while (true) {
+        //find valid direction
+        int did = checkCell(focusedCell, visited);
+        if (did == -1) { //hunt
+            bool found = false;
+            for (int i = 0;i<15;i++) {
+                for (int j = 0;j<15;j++) {
+                    did = checkCell(make_int2(i,j),visited);
+                    if (did != -1 && visited[i][j]) {
+                        focusedCell = make_int2(i,j);
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) break;
+            }
+
+            //nothing to hunt, break out of while (true)
+            if (!found) break;
+        } 
+        
+        // kill
+        if (did == 0) { // up
+            maze.cells[focusedCell.x][focusedCell.y].up = true;
+            maze.cells[focusedCell.x-1][focusedCell.y].down = true;
+            visited[focusedCell.x-1][focusedCell.y] = true;
+            focusedCell.x -= 1;
+            //trMessageBox(NULL, "Up", "Error", MB_OK);
+        } else if (did == 1) { // right
+            maze.cells[focusedCell.x][focusedCell.y].right = true;
+            maze.cells[focusedCell.x][focusedCell.y+1].left = true;
+            visited[focusedCell.x][focusedCell.y+1] = true;
+            focusedCell.y += 1;
+            //MessageBox(NULL, "Right", "Error", MB_OK);
+        } else if (did == 2) { // down
+            maze.cells[focusedCell.x][focusedCell.y].down = true;
+            maze.cells[focusedCell.x+1][focusedCell.y].up = true;
+            visited[focusedCell.x+1][focusedCell.y] = true;
+            focusedCell.x += 1;
+            //MessageBox(NULL, "Down", "Error", MB_OK);
+        } else if (did == 3) { // left
+            maze.cells[focusedCell.x][focusedCell.y].left = true;
+            maze.cells[focusedCell.x][focusedCell.y-1].right = true;
+            visited[focusedCell.x][focusedCell.y-1] = true;
+            focusedCell.y -= 1;
+            //MessageBox(NULL, "Left", "Error", MB_OK);
+        }
+
+    }
+
+    return maze;
+}
+
+
+Maze maze;
+
+
+void showMazePath(Maze* maze) {
+    std::string mazeStr;
+
+    for (int x = 0; x < 15; x++) {
+        for (int y = 0; y < 15; y++) {
+            Cell cell = maze->cells[x][y];
+
+            if (cell.up && cell.down && cell.left && cell.right) {
+                mazeStr += "+";
+            } else if (cell.right && cell.left && cell.down) {
+                mazeStr += "T";
+            } else  if (cell.right && cell.left && cell.up) {
+                mazeStr += "^";
+            } else  if (cell.right && cell.up && cell.down) {
+                mazeStr += "}";
+            } else  if (cell.up && cell.down && cell.left) {
+                mazeStr += "{";
+            } else  if (cell.up && cell.down) {
+                mazeStr += "|";
+            } else if (cell.right && cell.left) {
+                mazeStr += "=";
+            } else  if (cell.right && cell.up) {
+                mazeStr += "L";
+            } else  if (cell.up && cell.left) {
+                mazeStr += "J";
+            } else  if (cell.down && cell.left) {
+                mazeStr += "7";
+            } else  if (cell.right && cell.down) {
+                mazeStr += "F";
+            } else  if (cell.up) {
+                mazeStr += "i";
+            } else  if (cell.down) {
+                mazeStr += "i";
+            } else  if (cell.left) {
+                mazeStr += "-";
+            } else  if (cell.right) {
+                mazeStr += "-";
+            } else {
+                mazeStr += " "; // isolated cell (shouldn’t happen in perfect maze)
+            }
+
+            mazeStr += " "; // spacing
+        }
+        mazeStr += "\n";
+    }
+
+    MessageBox(NULL, mazeStr.c_str(), "Maze Path", MB_OK);
+}
 
 interpolator tickLogic(int tickCount,int2 mouse,bool mousePressed,bool* keys) {
     interpolator result;
     meshCountThisTick = 0;
     if (tickCount == 0) {
-        player.walkSpeed = 0.1f;
+        maze = generateMaze();
+        showMazePath(&maze);
+
+        player.walkSpeed = 0.05f;
         player.yaw = pi;
         cudaMalloc(&scene,sizeof(Triangle) * maxAmountOfTriangles);
         cudaMalloc(&triBright,sizeof(float) * maxAmountOfTriangles);
@@ -79,10 +247,24 @@ interpolator tickLogic(int tickCount,int2 mouse,bool mousePressed,bool* keys) {
         loadingModels = true;
         Model cube;
         cube.triangles = new Triangle[12];
+        Model rectH;
+        rectH.triangles = new Triangle[12];
+        Model rectV;
+        rectV.triangles = new Triangle[12];
 
         float3 verts[8] = {
             {-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1},
             {-1, -1,  1}, {1, -1,  1}, {1, 1,  1}, {-1, 1,  1}
+        };
+
+        float3 vertsh[8] = {
+            {-1, -1, -3}, {1, -1, -3}, {1, 1, -3}, {-1, 1, -3},
+            {-1, -1,  3}, {1, -1,  3}, {1, 1,  3}, {-1, 1,  3}
+        };
+
+        float3 vertsv[8] = {
+            {-3, -1, -1}, {3, -1, -1}, {3, 1, -1}, {-3, 1, -1},
+            {-3, -1,  1}, {3, -1,  1}, {3, 1,  1}, {-3, 1,  1}
         };
 
         // Define triangles (two per face)
@@ -101,34 +283,139 @@ interpolator tickLogic(int tickCount,int2 mouse,bool mousePressed,bool* keys) {
             cube.triangles[i].p3 = verts[faces[i][2]];
         }
         loadModel(0,cube.triangles,12);
+        for (int i = 0; i < 12; ++i) {
+            rectH.triangles[i].p1 = vertsh[faces[i][0]];
+            rectH.triangles[i].p2 = vertsh[faces[i][1]];
+            rectH.triangles[i].p3 = vertsh[faces[i][2]];
+        }
+        loadModel(1,rectH.triangles,12);
+        for (int i = 0; i < 12; ++i) {
+            rectV.triangles[i].p1 = vertsv[faces[i][0]];
+            rectV.triangles[i].p2 = vertsv[faces[i][1]];
+            rectV.triangles[i].p3 = vertsv[faces[i][2]];
+        }
+        loadModel(2,rectV.triangles,12);
     }
-    if (tickCount == 200) {
+    if (tickCount == 10) {
         loadingModels = false;
+        player.position.x = 2.0f;
+        player.position.z = 2.0f;
+        //player.position.y = 2.0f;
+
+        // for (int i = 0;i<15;i++) {
+        //     for (int j = 0;j<14;j++) {
+        //         if (maze.cells[i][j].right ^ maze.cells[i][j+1].left) {
+        //             MessageBox(NULL, "Maze generation error: inconsistent cell connections", "Error", MB_OK);
+        //         }
+        //     }
+        // }
+        // for (int i = 0;i<14;i++) {
+        //     for (int j = 0;j<15;j++) {
+        //         if (maze.cells[i][j].down ^ maze.cells[i-1][j].up) {
+        //             MessageBox(NULL, "Maze generation error: inconsistent cell connections", "Error", MB_OK);
+        //         }
+        //     }
+        // }
     }
     if (!loadingModels) {
+        float deltaX = 0.0f;
+        float deltaZ = 0.0f;
         if (keys[87]) {  // W - forward
-            player.position.x+=(player.walkSpeed * sin(player.yaw));
-            player.position.z+=(player.walkSpeed * cos(player.yaw));
+            deltaX += (player.walkSpeed * sin(player.yaw));
+            deltaZ += (player.walkSpeed * cos(player.yaw));
         }
         if (keys[83]) {  // S - backward
-            player.position.x-=(player.walkSpeed * sin(player.yaw));
-            player.position.z-=(player.walkSpeed * cos(player.yaw));
+            deltaX -= (player.walkSpeed * sin(player.yaw));
+            deltaZ -= (player.walkSpeed * cos(player.yaw));
         }
         if (keys[65]) {  // A - left
-            player.position.x-=(player.walkSpeed * sin(player.yaw + pi/2));
-            player.position.z-=(player.walkSpeed * cos(player.yaw + pi/2));
+            deltaX -= (player.walkSpeed * sin(player.yaw + pi/2));
+            deltaZ -= (player.walkSpeed * cos(player.yaw + pi/2));
         }
         if (keys[68]) {  // D - right
-            player.position.x+=(player.walkSpeed * sin(player.yaw + pi/2));
-            player.position.z+=(player.walkSpeed * cos(player.yaw + pi/2));
+            deltaX += (player.walkSpeed * sin(player.yaw + pi/2));
+            deltaZ += (player.walkSpeed * cos(player.yaw + pi/2));
         }
+
+        float newX = player.position.x + deltaX;
+        float newZ = player.position.z + deltaZ;
+        
+        int cellX = (int)(newX / 4.0f);
+        int cellZ = (int)(newZ / 4.0f);
+
+        //check if already valid new pos
+        if (
+            cellX >= 0 && cellX < 15 && cellZ >= 0 && cellZ < 15 &&
+            (
+                (fabsf(newX-(4*cellX + 2.0f)) < 0.5f && fabsf(newZ-(4*cellZ + 2.0f)) < 0.5f) || //Option one: new pos is in center of cell
+                (maze.cells[cellX][cellZ].left && fabsf(newZ-(4*cellZ + 0.75f)) < 0.76f && fabsf(newX-(4*cellX + 2.0f)) < 0.5f) || //other options: in the other segments of the maze path
+                (maze.cells[cellX][cellZ].right && fabsf(newZ-(4*cellZ + 3.25f)) < 0.76f && fabsf(newX-(4*cellX + 2.0f)) < 0.5f) || 
+                (maze.cells[cellX][cellZ].up && fabsf(newZ-(4*cellZ + 2.0f)) < 0.5f && fabsf(newX-(4*cellX + 0.75f)) < 0.76f) || 
+                (maze.cells[cellX][cellZ].down && fabsf(newZ-(4*cellZ + 2.0f)) < 0.5f && fabsf(newX-(4*cellX + 3.25f)) < 0.76f)
+            )
+        ) {
+            player.position.x = newX;
+            player.position.z = newZ;
+        } else { // otherwise, simply dont move
+            
+        }
+        
+        
+        
         if (mouse.x != 0) {
             player.yaw += (mouse.x) * 0.005f;
         }
 
         
-        // Outer walls
-        loadMesh(0, make_float3(0.0f, 0.0f, -5.0f), make_float3(0.0f, 1.0f, 0.0f), 5.0f, 0.0f);
+        //render maze
+        for (int x = 0; x < 15; x++) {
+            for (int z = 0; z < 15; z++) {
+                float wx = x * 4.0f;
+                float wz = z * 4.0f;
+
+                if (!maze.cells[x][z].left) {
+                    if (fabsf(player.position.x - (wx+2)) < 10 && fabsf(player.position.z - (wz+2)) < 10) {
+                        loadMesh(2, make_float3(wx+2,0.0f,wz), make_float3(0.0f,1.0f,0.0f), 0.5f, 0.0f);
+                    }
+                        
+                }
+
+                if (!maze.cells[x][z].up) {
+                    if (fabsf(player.position.x - (wx+2)) < 10 && fabsf(player.position.z - (wz+2)) < 10) {
+                        loadMesh(1, make_float3(wx,0.0f,wz+2), make_float3(0.0f,1.0f,0.0f), 0.5f, 0.0f);
+                    }
+                        
+                }
+
+                if (x==14 || z==14) {
+                    if (!maze.cells[x][z].right) {
+                        if (fabsf(player.position.x - (wx+2)) < 10 && fabsf(player.position.z - (wz+2)) < 10) {
+                            loadMesh(2, make_float3(wx+2,0.0f,wz+4), make_float3(0.0f,1.0f,0.0f), 0.5f, 0.0f);
+                        }
+                            
+                    }
+
+                    if (!maze.cells[x][z].down) {
+                        if (fabsf(player.position.x - (wx+2)) < 10 && fabsf(player.position.z - (wz+2)) < 10) {
+                            loadMesh(1, make_float3(wx+4,0.0f,wz+2), make_float3(0.0f,1.0f,0.0f), 0.5f, 0.0f);
+                        }
+                            
+                    }
+                }
+
+                if (fabsf(player.position.x - (wx+2)) < 10 && fabsf(player.position.z - (wz+2)) < 10 && ((int)wz)%4==0 && ((int)wx)%4==0) {
+                    loadMesh(0, make_float3(wx,0.0f,wz), make_float3(0.0f,1.0f,0.0f), 0.5f, 0.0f);
+                }
+
+                // Optional: also draw right/down if you want full coverage
+            }
+        }
+
+
+        
+
+
+
         
 
 
@@ -398,7 +685,7 @@ w.z = p1.z + (u.z*(v.y*dx - v.x*dy) - v.z*(u.y*dx - u.x*dy)) / denom;
 
                 if (w.z < wz) {
                     wz = w.z;
-                    color = (int) (sqrt(brightness) * 255);
+                    color = (int) (sqrt(brightness / fminf(1.0f, wz * wz)) * 255 );
                 }
             }
         }

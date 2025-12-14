@@ -7,7 +7,7 @@
 
 int width = 1500;
 int height = 1000;
-float targetTPS = 20;
+float targetTPS = 60;
 int refreshRate;
 BITMAPINFO bmi;
 int currentActiveInterpolator = 0; //cpu side
@@ -122,7 +122,7 @@ __global__ void frameComputeLoop(gpuMeta* gpuMetaData, int width, int height,cud
 
         // Launch the frame computation
         computeFrame(gpuMetaData->frame,width, height,&gpuMetaData->interpolators[gpuMetaData->activeInterpolator],interpolationFactor);
-        __nanosleep(5000000); // 5 ms sleep (note that fps will never exceed 200 with this)
+        __nanosleep(200000000); // 5 ms sleep (note that fps will never exceed 200 with this)
 
         gpuMetaData->framesCalculated = gpuMetaData->framesCalculated + 1;
         //copy frame if needed

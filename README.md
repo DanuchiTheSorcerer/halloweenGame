@@ -1,1 +1,1 @@
-3d engine based on low level gameEngine code also on github
+Maze Game for game jam based on Xigafio 3d engine also on this GitHub. This is a recreation of my ShadowPath game made originally in 2d, which is also on GitHub.
